@@ -1,4 +1,5 @@
 extends Node
+signal save_finished(success: bool)
 
 const SAVE_VERSION := 1
 var save_path := "user://player_progress.json"
@@ -10,6 +11,9 @@ var last_save_error := ""
 
 
 func _ready() -> void:
+	add_child(preload("res://ui/shared/scene_reveal.gd").new())
+	add_child(preload("res://ui/shared/save_notice.gd").new())
+	add_child(preload("res://ui/shared/screen_keyboard.gd").new())
 	# Smoke tests never touch the player's real profile.
 	for argument in OS.get_cmdline_user_args():
 		if argument == "--no-save":
@@ -107,11 +111,13 @@ func save_progress() -> bool:
 	if DirAccess.rename_absolute(temporary, save_path) != OK:
 		return _save_failed("Không thể cập nhật file tiến độ.")
 	last_save_error = ""
+	save_finished.emit(true)
 	return true
 
 
 func _save_failed(message: String) -> bool:
 	last_save_error = message
+	save_finished.emit(false)
 	push_warning(message)
 	return false
 

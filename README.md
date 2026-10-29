@@ -2,12 +2,18 @@
 
 Đề tài: Nghiên cứu phát triển ứng dụng game Pixel 2D tích hợp trí tuệ nhân tạo nhận diện cử động cánh tay hỗ trợ tập luyện phục hồi chức năng.
 
+Thực hiện: Nông Thị Hồng Lan (chủ trì), Nguyễn Ngọc Gia Hân.
+
+Cập nhật: **16/10/2026**. Trạng thái: **prototype frontend chơi thử được trên cả 5 map bằng dữ liệu giả lập**. Chưa phải bản tích hợp BE hoàn chỉnh hay sản phẩm đã được thẩm định chuyên môn.
+
 ## Chạy dự án
 
 1. Dùng Godot **4.7.2** (phiên bản đã dùng để kiểm thử).
 2. Import `project.godot`, đợi Godot tạo cache/import assets rồi nhấn F6 cho scene hoặc F5 để chạy từ menu.
 3. Đi qua luồng Bắt đầu → hiệu chỉnh giả lập → chọn map → chọn mức độ → hướng dẫn → tập luyện.
 4. Project đang autoload `PoseInput` từ `core/pose/mock_pose_provider.gd`, không kết nối camera/backend thật.
+
+Khi giải nén, nên dùng đường dẫn ngắn như `D:/GamePHCN/` để tránh lỗi đường dẫn Windows quá dài. Giữ các file `.uid` và `.import` đi kèm nguồn; không cần bàn giao cache `.godot/`.
 
 ## Mức độ hoàn thiện
 
@@ -95,3 +101,13 @@ Các kiểm thử audio, chuyển màn và hướng dẫn đã báo PASS trong l
 3. Thay nhạc/SFX chính thức; cân âm lượng và xử lý cảnh báo giải phóng tài nguyên.
 4. Hoàn thiện background/assets từng map theo bộ nguồn mới.
 5. Kiểm thử nhiều độ phân giải, máy yếu, mất kết nối và bản export trước bàn giao cuối.
+
+## Dọn thư mục ngày 16/10/2026
+
+File cũ không dùng được **dời ra ngoài**, không xóa vĩnh viễn:
+`D:/-NCKH-GamePixel2D_PHCN/HANDOFF_ARCHIVE_20261016_UI_AUDIO/`.
+Có `manifest.csv` ghi đường dẫn nguồn/đích và SHA-256 để phục hồi.
+
+Bộ nút cũ, script chuẩn bị art phụ thuộc nguồn ngoài và ảnh test cũ được lưu tại đó.
+Không thay đổi lịch sử Git, không reset các chỉnh sửa có sẵn; cache editor và giấy phép được giữ.
+README thay thế liên kết cũ tới HANDOFF_BE.txt không còn tồn tại.

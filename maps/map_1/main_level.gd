@@ -118,7 +118,7 @@ func _on_session_feedback_changed(code: String) -> void:
 	feedback_label.text = _feedback_text(display_code)
 	match display_code:
 		"REP_VALID", "TRACKING_RESTORED", "ACTION_ZONE_READY":
-			feedback_label.modulate = Color(0.1, 0.75, 0.2)
+			feedback_label.modulate = Color("ffd85a")
 		"MOVEMENT_TOO_FAST", "REP_REJECTED", "TRACKING_LOST", "BACKEND_DISCONNECTED":
 			feedback_label.modulate = Color(0.9, 0.2, 0.1)
 		_:
@@ -126,7 +126,7 @@ func _on_session_feedback_changed(code: String) -> void:
 
 
 func _on_repetition_accepted(data: Dictionary) -> void:
-	feedback_label.modulate = Color(0.1, 0.75, 0.2)
+	feedback_label.modulate = Color("ffd85a")
 	if Global.selected_action == 1:
 		map1_controller.handle_valid_repetition(data)
 

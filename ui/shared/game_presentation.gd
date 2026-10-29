@@ -13,6 +13,7 @@ var replay_label: Label
 var intro_guide: Control
 var status_display: RichTextLabel
 var last_status := ""
+var last_subtitle := ""
 const STATUS_COLORS := {
 	"ĐANG TẬP": "75e889", "TẠM DỪNG": "ffdc69",
 	"ĐANG NGHỈ": "80caff", "CHUẨN BỊ": "ffd28a",
@@ -88,7 +89,7 @@ func _ready() -> void:
 	level.feedback_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	level.feedback_label.vertical_alignment = VERTICAL_ALIGNMENT_TOP
 	level.feedback_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	level.feedback_label.add_theme_font_size_override("font_size",20)
+	level.feedback_label.add_theme_font_size_override("font_size",28)
 	level.hearts_label.visible = TrackingStability.ENABLED
 	place(level.hearts_label,Rect2(940,24,200,32))
 	level.hearts_label.vertical_alignment = VERTICAL_ALIGNMENT_TOP
@@ -120,6 +121,8 @@ func _ready() -> void:
 	label("CAMERA NGƯỜI TẬP",Rect2(654,397,390,28),ui)
 	label("Chưa kết nối camera\n\nKhung 16:9 dành cho hình ảnh\nsau khi tích hợp backend.",Rect2(650,456,420,148),ui)
 	_build_intro()
+	var results := preload("res://ui/shared/session_results.gd").new()
+	level.add_child.call_deferred(results)
 	# Ensure overlays stay above newly added HUD controls.
 	for name in ["InstructionPanel","ResultPanel","CountdownLabel","RestLabel"]:
 		ui.move_child(ui.get_node(name),-1)
@@ -200,12 +203,39 @@ func _review() -> void:
 	close.text = "TIẾP TỤC CHƠI"
 	close.pressed.connect(_resume)
 	replay.add_child(close)
+	close.grab_focus()
+	close.focus_next = NodePath(".")
+	close.focus_previous = NodePath(".")
 	replay_label = label("",Rect2(400,594,350,36),replay)
 
 func _resume() -> void:
 	if resuming >= 0: return
 	replay_guide.complete = true
 	resuming = 3
+
+func _sync_subtitle() -> void:
+	var caption: Label = level.feedback_label
+	if caption.text == last_subtitle: return
+	var raw := caption.text.replace("\n", " ").strip_edges()
+	var font := caption.get_theme_font("font")
+	var font_size := caption.get_theme_font_size("font_size")
+	var width := caption.size.x - 8.0
+	last_subtitle = raw
+	if font.get_string_size(raw, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x > width:
+		var words := raw.split(" ", false)
+		var best_score := INF
+		for split in range(2, words.size() - 1):
+			var left := " ".join(words.slice(0, split))
+			var right := " ".join(words.slice(split))
+			var a := font.get_string_size(left, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
+			var b := font.get_string_size(right, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
+			if a > width or b > width: continue
+			var score := absf(a - b)
+			if left.ends_with(".") or left.ends_with("!") or left.ends_with("—"): score -= width * 0.3
+			if score < best_score:
+				best_score = score
+				last_subtitle = left + "\n" + right
+	caption.text = last_subtitle
 
 func _sync_status() -> void:
 	var value: String = level.state_label.text.trim_prefix("TRẠNG THÁI:").strip_edges()
@@ -215,6 +245,7 @@ func _sync_status() -> void:
 	status_display.text = "TRẠNG THÁI: [color=#%s]%s[/color]" % [STATUS_COLORS.get(value,"c7d8ef"),value]
 
 func _process(delta: float) -> void:
+	_sync_subtitle()
 	_sync_status()
 	if not is_instance_valid(replay): return
 	if level.get_node("SettingsMenu").overlay.visible: return
@@ -231,8 +262,13 @@ func _process(delta: float) -> void:
 			session.set_menu_paused(false)
 			owns_pause = false
 			ui.get_node("SettingsButton").disabled = false
+			ui.get_node("SettingsButton").grab_focus()
 
 func _unhandled_key_input(event: InputEvent) -> void:
+	if is_instance_valid(replay) and event.is_action_pressed("ui_cancel") and not event.is_echo():
+		_resume()
+		get_viewport().set_input_as_handled()
+		return
 	if not event is InputEventKey or not event.pressed or event.echo or get_tree().paused: return
 	if event.keycode == KEY_U: _review()
 	if event.keycode == KEY_I: _joints()

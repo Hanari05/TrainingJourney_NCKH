@@ -8,6 +8,7 @@ var current_track := -1
 var last_scene: Node
 var hover_time := 0
 var click_time := 0
+var music_fade: Tween
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -33,7 +34,7 @@ func _wire_button(node: Node) -> void:
 	node.mouse_entered.connect(func():
 		if is_instance_valid(node) and not node.disabled and node.is_visible_in_tree():
 			var now := Time.get_ticks_msec()
-			if now - hover_time > 120:
+			if now - hover_time > 180:
 				hover_time = now
 				play_sfx("ui_hover"))
 
@@ -60,12 +61,17 @@ func play_music(id: int) -> void:
 	id = clampi(id, 0, 5)
 	if current_track == id and music.playing: return
 	current_track = id
+	if music_fade != null: music_fade.kill()
 	music.stream = stream("music/" + TRACKS[id] + "_loop.wav", true)
+	music.volume_db = -40
 	music.play()
+	music_fade = create_tween()
+	music_fade.tween_property(music, "volume_db", -14.0, 0.4)
 
 func play_sfx(sound: String) -> void:
 	for player in voices:
 		if not player.playing:
+			player.volume_db = -18 if sound == "ui_hover" else (-12 if sound == "ui_click" else -8)
 			player.stream = stream("sfx/" + sound + ".wav")
 			player.play()
 			return
@@ -87,6 +93,7 @@ func attach_level(level: Node, id: int) -> void:
 	level.add_child(audio)
 
 func _exit_tree() -> void:
+	if music_fade != null: music_fade.kill()
 	music.stop()
 	music.stream = null
 	for player in voices:

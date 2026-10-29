@@ -109,7 +109,7 @@ func _on_session_feedback_changed(code: String) -> void:
 		display_code = "WALLS_CLOSING"
 	feedback_label.text = _feedback_text(display_code)
 	if display_code in ["REP_VALID", "TRACKING_RESTORED", "ACTION_ZONE_READY", "HOLD_COMPLETED"]:
-		feedback_label.modulate = Color(0.1, 0.75, 0.2)
+		feedback_label.modulate = Color("ffd85a")
 	elif display_code in ["MOVEMENT_TOO_FAST", "REP_REJECTED", "HOLD_INTERRUPTED", "TRACKING_LOST", "BACKEND_DISCONNECTED"]:
 		feedback_label.modulate = Color(0.9, 0.2, 0.1)
 	else:
