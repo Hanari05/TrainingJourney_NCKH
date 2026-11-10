@@ -33,6 +33,12 @@ var _started_at := ""
 var _map_id := 1
 var _difficulty := 1
 var _menu_paused := false
+var _tracking_recovery_paused := false
+var _patient_id := ""
+var _patient_name := ""
+var _calibration_rom := 0.0
+var _durations := {"active_seconds": 0.0, "rest_seconds": 0.0, "paused_seconds": 0.0, "tracking_lost_seconds": 0.0}
+
 
 
 func set_menu_paused(paused: bool) -> void:
@@ -49,6 +55,7 @@ func set_menu_paused(paused: bool) -> void:
 
 
 func _ready() -> void:
+	process_mode = Node.PROCESS_MODE_ALWAYS
 	_pose_input = get_node("/root/PoseInput")
 	_pose_input.connection_changed.connect(_on_connection_changed)
 	_pose_input.tracking_status_changed.connect(_on_tracking_status_changed)
@@ -57,6 +64,14 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	if _session_started:
+		var key := "active_seconds"
+		if _menu_paused or state == State.PAUSED: key = "paused_seconds"
+		elif state == State.TRACKING_LOST: key = "tracking_lost_seconds"
+		elif _tracking_recovery_paused: key = "paused_seconds"
+		elif state == State.RESTING: key = "rest_seconds"
+		_durations[key] += delta
+	if _menu_paused or _tracking_recovery_paused: return
 	if state != State.RESTING:
 		return
 	rest_seconds_remaining = maxf(rest_seconds_remaining - delta, 0.0)
@@ -71,6 +86,10 @@ func start_session(session_config: Dictionary) -> bool:
 	config = session_config.duplicate(true)
 	session_id = "%s-%s" % [str(config.get("session_id", "exercise")), Crypto.new().generate_random_bytes(12).hex_encode()]
 	_started_at = Time.get_datetime_string_from_system(true)
+	_patient_id = Global.current_patient_id
+	_patient_name = Global.current_patient_name
+	_calibration_rom = Global.max_rom_angle
+	for key in _durations: _durations[key] = 0.0
 	_map_id = Global.selected_action
 	_difficulty = 3 if Global.speed_multiplier >= 2.0 else (2 if Global.speed_multiplier >= 1.5 else 1)
 	exercise_id = str(config["exercise_id"])
@@ -81,6 +100,7 @@ func start_session(session_config: Dictionary) -> bool:
 	rest_seconds_remaining = 0.0
 	repetition_input_enabled = true
 	_accepted_candidate_ids.clear()
+	_tracking_recovery_paused = false
 	_session_started = true
 	_change_state(State.READY)
 	_emit_progress()
@@ -113,6 +133,7 @@ func start_session(session_config: Dictionary) -> bool:
 func stop_session(reason := "user_cancelled") -> void:
 	if not _session_started:
 		return
+	Global.record_session(_build_summary("stopped_early" if reason in ["user_cancelled", "scene_changed"] else "interrupted"))
 	_session_started = false
 	_pose_input.stop_exercise(reason)
 	_change_state(State.IDLE)
@@ -166,7 +187,7 @@ func debug_skip_rest() -> void:
 
 
 func _on_exercise_event_received(data: Dictionary) -> void:
-	if _menu_paused or get_tree().paused:
+	if _menu_paused or _tracking_recovery_paused or get_tree().paused:
 		return
 	if not _session_started or state != State.ACTIVE:
 		return
@@ -175,8 +196,9 @@ func _on_exercise_event_received(data: Dictionary) -> void:
 	if str(data.get("exercise_id", "")) != exercise_id:
 		return
 	match str(data.get("event", "")):
-		"movement_started": feedback_changed.emit("MOVEMENT_STARTED")
-		"target_reached": feedback_changed.emit("TARGET_REACHED")
+		"movement_started": feedback_changed.emit(str(data.get("feedback_code", "MOVEMENT_STARTED")))
+		"feedback": feedback_changed.emit(str(data.get("feedback_code", "")))
+		"target_reached": feedback_changed.emit(str(data.get("feedback_code", "TARGET_REACHED")))
 		"hold_started":
 			hold_started.emit(data)
 			hold_progress_changed.emit(0.0, 0, int(config.get("hold_duration_ms", 0)))
@@ -188,7 +210,6 @@ func _on_exercise_event_received(data: Dictionary) -> void:
 			if target_ms > 0 and not data.has("hold_progress"):
 				progress = float(elapsed_ms) / float(target_ms)
 			hold_progress_changed.emit(clampf(progress, 0.0, 1.0), elapsed_ms, target_ms)
-			feedback_changed.emit("HOLD_PROGRESS")
 		"hold_completed":
 			var target_ms := int(data.get("hold_target_ms", config.get("hold_duration_ms", 0)))
 			hold_progress_changed.emit(1.0, target_ms, target_ms)
@@ -247,20 +268,7 @@ func _complete_session() -> void:
 	_change_state(State.COMPLETED)
 	var tracker := get_parent().get_node_or_null("TrackingStability")
 	var stability := int(tracker.stability) if tracker != null else 0
-	var summary := {
-		"session_id": session_id,
-		"map_id": _map_id,
-		"difficulty": _difficulty,
-		"started_at_utc": _started_at,
-		"completed_at_utc": Time.get_datetime_string_from_system(true),
-		"stability": stability,
-		"stability_enabled": TrackingStability.ENABLED,
-		"evaluation": "HOÀN THÀNH" if not TrackingStability.ENABLED else ("HOÀN HẢO" if stability >= 3 else ("HOÀN THÀNH" if stability == 2 else "CẦN CẢI THIỆN ĐỘ ỔN ĐỊNH")),
-		"exercise_id": exercise_id,
-		"valid_reps": total_valid_reps,
-		"rejected_reps": total_rejected_reps,
-		"phase_count": int(config["phase_count"]),
-	}
+	var summary := _build_summary("completed")
 	var bonus_controller := get_parent().get_node_or_null("Map5Controller")
 	if bonus_controller != null:
 		summary["bonus_points"] = int(bonus_controller.bonus_points)
@@ -281,7 +289,7 @@ func _on_tracking_status_changed(data: Dictionary) -> void:
 		_state_before_tracking_loss = state
 		_pose_input.pause_exercise("tracking_lost")
 		_change_state(State.TRACKING_LOST)
-		feedback_changed.emit("TRACKING_LOST")
+		feedback_changed.emit("CAMERA_DISCONNECTED" if str(data.get("feedback_code", "")) == "CAMERA_DISCONNECTED" else "TRACKING_LOST")
 	elif tracking_ok and state == State.TRACKING_LOST:
 		if _state_before_tracking_loss == State.RESTING:
 			_change_state(State.RESTING)
@@ -293,7 +301,7 @@ func _on_tracking_status_changed(data: Dictionary) -> void:
 			else:
 				_pose_input.pause_exercise("waiting_for_action_zone")
 			_change_state(State.ACTIVE)
-		feedback_changed.emit("TRACKING_RESTORED")
+		feedback_changed.emit("CAMERA_RECONNECTED" if str(data.get("feedback_code", "")) == "CAMERA_RECONNECTED" else "TRACKING_RESTORED")
 
 
 func _on_connection_changed(connected: bool, _details: Dictionary) -> void:
@@ -336,5 +344,51 @@ func _validate_config(session_config: Dictionary) -> bool:
 
 
 func _resume_provider() -> void:
-	if not _menu_paused:
+	if not _menu_paused and not _tracking_recovery_paused:
 		_pose_input.resume_exercise()
+
+
+func _build_summary(outcome: String) -> Dictionary:
+	var tracker := get_parent().get_node_or_null("TrackingStability")
+	var stability := int(tracker.stability) if tracker != null else 0
+	var summary := {
+		"summary_schema_version": 2,
+		"duration_source": "godot_state_timer",
+		"targets_source": "godot_session_config",
+		"session_id": session_id,
+		"patient_id": _patient_id,
+		"patient_name": _patient_name,
+		"calibration_rom_angle": roundf(_calibration_rom * 10.0) / 10.0,
+		"rom_source": "calibration_snapshot",
+		"map_id": _map_id,
+		"difficulty": _difficulty,
+		"started_at_utc": _started_at,
+		"ended_at_utc": Time.get_datetime_string_from_system(true),
+		"status": outcome,
+		"stability": stability,
+		"stability_enabled": TrackingStability.ENABLED,
+		"evaluation": "HOÀN THÀNH" if not TrackingStability.ENABLED else ("HOÀN HẢO" if stability >= 3 else ("HOÀN THÀNH" if stability == 2 else "CẦN CẢI THIỆN ĐỘ ỔN ĐỊNH")),
+		"exercise_id": exercise_id,
+		"valid_reps": total_valid_reps,
+		"rejected_reps": total_rejected_reps,
+		"phase_count": int(config["phase_count"]),
+	}
+	if outcome == "completed": summary["completed_at_utc"] = summary["ended_at_utc"]
+	else: summary["evaluation"] = "DỪNG SỚM" if outcome == "stopped_early" else "GIÁN ĐOẠN"
+	summary["target_sets"] = int(config["phase_count"])
+	summary["target_reps"] = int(config["phase_count"]) * int(config["repetitions_per_phase"])
+	summary["completed_reps"] = total_valid_reps
+	summary["completed_sets"] = mini(int(config["phase_count"]), int(float(total_valid_reps) / maxi(1, int(config["repetitions_per_phase"]))))
+	for key in _durations: summary[key] = snappedf(float(_durations[key]), 0.01)
+	return summary
+
+
+# Separate from user/menu pause so tracking loss retains its own duration category.
+func set_tracking_recovery_paused(paused: bool) -> void:
+	if _tracking_recovery_paused == paused: return
+	_tracking_recovery_paused = paused
+	if not _session_started: return
+	if paused:
+		_pose_input.pause_exercise("tracking_recovery")
+	elif state == State.ACTIVE and repetition_input_enabled:
+		_resume_provider()

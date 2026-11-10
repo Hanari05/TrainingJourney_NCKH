@@ -49,6 +49,7 @@ func _ready() -> void:
 	exercise_session.hold_interrupted.connect(_on_hold_interrupted)
 	exercise_session.rest_time_changed.connect(_on_rest_time_changed)
 	exercise_session.session_completed.connect(_on_session_completed)
+	PoseInput.pose_frame_received.connect(_on_pose_frame_received)
 
 	tracking_stability.grace_seconds = tracking_loss_grace_seconds
 	tracking_stability.setup(exercise_session, PoseInput)
@@ -76,6 +77,7 @@ func _ready() -> void:
 
 
 func _unhandled_key_input(event: InputEvent) -> void:
+	if not OS.is_debug_build(): return
 	if event is InputEventKey and event.pressed and not event.echo and event.physical_keycode == KEY_N:
 		exercise_session.debug_skip_rest()
 
@@ -120,12 +122,21 @@ func _on_session_feedback_changed(code: String) -> void:
 	elif code == "SESSION_READY" and not map4_controller.is_action_window_open():
 		display_code = "APPROACHING_JUMP"
 	feedback_label.text = _feedback_text(display_code)
-	if display_code in ["REP_VALID", "TRACKING_RESTORED", "ACTION_ZONE_READY", "HOLD_COMPLETED"]:
+	if display_code in ["REP_VALID", "TRACKING_RESTORED", "CAMERA_RECONNECTED", "ACTION_ZONE_READY", "HOLD_COMPLETED", "JUMP_SUCCESS", "PREP_COMPLETED"]:
 		feedback_label.modulate = Color("ffd85a")
-	elif display_code in ["MOVEMENT_TOO_FAST", "REP_REJECTED", "HOLD_INTERRUPTED", "TRACKING_LOST", "BACKEND_DISCONNECTED"]:
+	elif display_code in ["TRANSITION_DELAY_3", "TRANSITION_DELAY_2", "TRANSITION_DELAY_1", "PREP_POSITION", "CLOSE_ELBOWS"]:
+		feedback_label.modulate = Color(0.2, 0.8, 1.0)
+	elif display_code in ["MOVEMENT_TOO_FAST", "REP_REJECTED", "HOLD_INTERRUPTED", "CAMERA_DISCONNECTED", "TRACKING_LOST", "BACKEND_DISCONNECTED"]:
 		feedback_label.modulate = Color(0.9, 0.2, 0.1)
 	else:
 		feedback_label.modulate = Color.WHITE
+
+	if display_code in ["HOLD_INTERRUPTED", "MOVEMENT_TOO_FAST", "REP_REJECTED"]:
+		var current_text := feedback_label.text
+		get_tree().create_timer(2.0).timeout.connect(func():
+			if is_instance_valid(feedback_label) and feedback_label.text == current_text:
+				_on_session_feedback_changed("ACTION_ZONE_READY" if map4_controller.is_action_window_open() else "PREP_POSITION")
+		)
 
 
 func _on_repetition_accepted(data: Dictionary) -> void:
@@ -155,7 +166,7 @@ func _on_hold_visual_progress_changed(progress: float) -> void:
 
 
 func _on_rest_time_changed(seconds_remaining: float) -> void:
-	rest_label.text = "NGHỈ: %d GIÂY\nNhấn N để bỏ qua khi debug" % ceili(seconds_remaining)
+	rest_label.text = "NGHỈ: %d GIÂY" % ceili(seconds_remaining)
 
 
 func _on_session_completed(summary: Dictionary) -> void:
@@ -200,7 +211,18 @@ func _on_action_window_changed(is_open: bool) -> void:
 	exercise_session.set_repetition_input_enabled(is_open)
 	_update_scrolling()
 	if is_open:
-		feedback_label.text = _feedback_text("ACTION_ZONE_READY")
+		_on_session_feedback_changed("ACTION_ZONE_READY")
+	else:
+		_on_session_feedback_changed("LEDGE_RUNNING")
+
+
+func _on_pose_frame_received(data: Dictionary) -> void:
+	if exercise_session.state != ExerciseSession.State.ACTIVE or not map4_controller.is_action_window_open():
+		return
+	var ex: Dictionary = data.get("exercise", {})
+	var fb_code: String = str(ex.get("feedback_code", ""))
+	if fb_code in ["PREP_POSITION", "PREP_COMPLETED", "CLOSE_ELBOWS", "RETURN_TO_PREP"]:
+		_on_session_feedback_changed(fb_code)
 
 
 func _show_intro() -> void:
@@ -311,18 +333,28 @@ func _feedback_text(code: String) -> String:
 		"SESSION_READY": "Sẵn sàng leo vách đá.",
 		"LEDGE_RUNNING": "Đang chạy trên bậc đá. Chuẩn bị vùng nhảy.",
 		"APPROACHING_JUMP": "Sắp tới vùng nhảy. Hãy chuẩn bị tư thế.",
-		"ACTION_ZONE_READY": "Vùng nhảy sẵn sàng. Ôm hai tay sau đầu và giữ 5 giây.",
+		"ACTION_ZONE_READY": "Hãy vào tư thế chuẩn bị: 2 tay ôm sau đầu, mở rộng khuỷu sang 2 bên.",
+		"PREP_POSITION": "Vào thế chuẩn bị: 2 tay ôm sau đầu, mở rộng khuỷu sang 2 bên.",
+		"PREP_COMPLETED": "Đã vào thế chuẩn bị! Chuẩn bị từ từ khép 2 khuỷu tay về trước.",
+		"TRANSITION_DELAY_3": "Từ từ khép 2 khuỷu tay về trước mặt: 3 giây...",
+		"TRANSITION_DELAY_2": "Từ từ khép 2 khuỷu tay về trước mặt: 2 giây...",
+		"TRANSITION_DELAY_1": "Từ từ khép 2 khuỷu tay về trước mặt: 1 giây...",
+		"CLOSE_ELBOWS": "Khép 2 khuỷu tay về phía trước mặt để chuẩn bị nhảy!",
 		"MOVEMENT_STARTED": "Đã nhận chuyển động.",
 		"TARGET_REACHED": "Đúng tư thế. Bắt đầu giữ 5 giây.",
-		"HOLD_STARTED": "Giữ nguyên tư thế...",
-		"HOLD_PROGRESS": "Tiếp tục giữ — sắp nhảy lên bậc tiếp theo.",
+		"HOLD_STARTED": "Giữ nguyên tư thế khép khuỷu tay — chuẩn bị nhảy bậc...",
+		"HOLD_PROGRESS": "Giữ nguyên tư thế khép 2 khuỷu tay (5 giây)...",
 		"HOLD_COMPLETED": "Đã giữ đủ 5 giây!",
 		"HOLD_INTERRUPTED": "Tư thế bị gián đoạn. Hãy thử lại chậm rãi.",
+		"JUMP_SUCCESS": "Tuyệt vời! Đã nhảy lên bậc tiếp theo thành công!",
+		"RETURN_TO_PREP": "Mở rộng 2 khuỷu tay sang 2 bên để chuẩn bị cho lần nhảy tiếp theo.",
 		"REP_VALID": "Tốt lắm! Đã nhảy lên bậc tiếp theo.",
 		"MOVEMENT_TOO_FAST": "Cử động quá nhanh. Hãy thực hiện chậm hơn.",
 		"REP_REJECTED": "Lần tập chưa hợp lệ.",
 		"PHASE_REST": "Hoàn thành hiệp. Hãy nghỉ 30 giây.",
 		"NEXT_PHASE": "Bắt đầu hiệp tiếp theo.",
+		"CAMERA_DISCONNECTED": "Mất kết nối Camera! Vui lòng kiểm tra lại dây cắm.",
+		"CAMERA_RECONNECTED": "Đã kết nối lại Camera. Tiếp tục buổi tập.",
 		"TRACKING_LOST": "Không nhìn thấy người chơi. Buổi tập đã tạm dừng.",
 		"TRACKING_RESTORED": "Đã nhận diện lại. Tiếp tục buổi tập.",
 		"BACKEND_DISCONNECTED": "Mất kết nối với hệ thống nhận diện.",

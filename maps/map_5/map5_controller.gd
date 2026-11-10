@@ -8,7 +8,7 @@ signal hold_visual_progress_changed(progress: float)
 signal side_changed(side_label: String)
 
 const SIDE_LABELS: Array[String] = ["TAY TRÁI", "TAY PHẢI"]
-const BONUS_PER_STRETCH := 50
+const BONUS_PER_STRETCH := 100
 const MAX_BONUS := 100
 
 var total_stretches := 2
@@ -59,14 +59,29 @@ func set_current_phase(phase: int) -> void:
 	_current_side_index = clampi(phase - 1, 0, SIDE_LABELS.size() - 1)
 	_emit_side(phase)
 	_update_side_indicators(phase)
+	if is_instance_valid(player) and is_instance_valid(player.mk2):
+		player.mk2.mirrored = (phase == 2)
+		player.mk2.amount = 0.0
+		player.mk2.refresh()
 	_reset_hold_visual()
 	_anchor_player()
+
+
+func handle_hold_started() -> void:
+	if not _action_window_open:
+		return
+	if is_instance_valid(player) and is_instance_valid(player.mk2):
+		player.mk2.amount = 1.0
+		player.mk2.refresh()
 
 
 func set_hold_progress(progress: float) -> void:
 	if not _action_window_open:
 		return
 	var clamped: float = clampf(progress, 0.0, 1.0)
+	if clamped > 0.0 and is_instance_valid(player) and is_instance_valid(player.mk2):
+		player.mk2.amount = 1.0
+		player.mk2.refresh()
 	_update_steam(clamped)
 	hold_visual_progress_changed.emit(clamped)
 
@@ -74,6 +89,9 @@ func set_hold_progress(progress: float) -> void:
 func handle_hold_interrupted() -> void:
 	if not _action_window_open:
 		return
+	if is_instance_valid(player) and is_instance_valid(player.mk2):
+		player.mk2.amount = 0.0
+		player.mk2.refresh()
 	_reset_hold_visual()
 	_anchor_player()
 

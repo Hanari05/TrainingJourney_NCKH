@@ -28,7 +28,7 @@ Ky thuat:
 
 Kiem thu:
 - dual_view_test: 1505 moc thoi gian, do dai doan tay, phep chieu hai goc,
-  chieu di chuyen, khuyu 90 do map 1, ban tay co dinh map 4, cho do map 5,
+  chieu di chuyen, duoi thang -> gap khuyu 90 do -> duoi thang map 1, ban tay co dinh map 4, cho do map 5,
   doi ben, bien khung, dung khi Settings, tu bat dau va xem lai/dem nguoc.
 - Chup 25 anh (5 moc x 5 map) bang renderer Compatibility 1152x648;
   kiem tra bang mat cac tu the chuan bi, giu va doi ben.
@@ -39,3 +39,9 @@ Gioi han:
 Kiem thu ky thuat va doi chieu mo ta khong thay the duyet chuyen mon PHCN.
 Ban tay pixel chua mo ta chi tiet ngon tay/long ban tay. Phan xoay ngoai,
 cam giac kep ba vai va muc do cang can nguoi phu trach chuyen mon duyet.
+
+CAP NHAT 2026-11-04: Map 1 doi chieu hinh tham chieu nguoi dung.
+0-3s: hai tay duoi ra truoc ngang vai; 3-7s: co khuyu/keo ra sau;
+7-11s: minh hoa tu the ep ba vai voi khuyu gap 90 do; 11-15s: duoi tay tro lai.
+Day la moc thoi gian video huong dan, KHONG doi thoi gian giu/nguong cua BE.
+Ap dung ca huong dan dau map va xem lai U; nut bo qua va dem nguoc giu nguyen.

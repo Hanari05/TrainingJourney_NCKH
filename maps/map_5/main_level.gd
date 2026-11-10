@@ -50,6 +50,7 @@ func _ready() -> void:
 	exercise_session.repetition_accepted.connect(_on_repetition_accepted)
 	exercise_session.repetition_rejected.connect(_on_repetition_rejected)
 	exercise_session.hold_progress_changed.connect(_on_hold_progress_changed)
+	exercise_session.hold_started.connect(_on_hold_started)
 	exercise_session.hold_interrupted.connect(_on_hold_interrupted)
 	exercise_session.rest_time_changed.connect(_on_rest_time_changed)
 	exercise_session.session_completed.connect(_on_session_completed)
@@ -64,6 +65,7 @@ func _ready() -> void:
 	map5_controller.action_window_changed.connect(_on_action_window_changed)
 	map5_controller.hold_visual_progress_changed.connect(_on_hold_visual_progress_changed)
 	map5_controller.side_changed.connect(_on_side_changed)
+	PoseInput.pose_frame_received.connect(_on_pose_frame_received)
 
 	_session_config = EXERCISE_CONFIG.duplicate(true)
 	_session_config["difficulty"] = _difficulty_name()
@@ -81,6 +83,7 @@ func _ready() -> void:
 
 
 func _unhandled_key_input(event: InputEvent) -> void:
+	if not OS.is_debug_build(): return
 	if event is InputEventKey and event.pressed and not event.echo and event.physical_keycode == KEY_N:
 		exercise_session.debug_skip_rest()
 
@@ -94,7 +97,7 @@ func _on_session_state_changed(current: ExerciseSession.State, _previous: Exerci
 	state_label.text = "TRẠNG THÁI: %s" % _state_text(current)
 	rest_label.visible = current == ExerciseSession.State.RESTING
 	if current == ExerciseSession.State.RESTING:
-		rest_label.text = "THƯ GIÃN: %d GIÂY\nNhấn N để bỏ qua khi debug" % ceili(exercise_session.rest_seconds_remaining)
+		rest_label.text = "THƯ GIÃN: %d GIÂY" % ceili(exercise_session.rest_seconds_remaining)
 	var gameplay_active := current == ExerciseSession.State.ACTIVE
 	map5_controller.set_session_active(gameplay_active)
 	if gameplay_active:
@@ -111,12 +114,39 @@ func _on_session_progress_changed(rep: int, reps_required: int, phase: int, phas
 
 func _on_session_feedback_changed(code: String) -> void:
 	feedback_label.text = _feedback_text(code)
-	if code in ["REP_VALID", "TRACKING_RESTORED", "ACTION_ZONE_READY", "HOLD_COMPLETED"]:
+	if code in ["REP_VALID", "TRACKING_RESTORED", "CAMERA_RECONNECTED", "ACTION_ZONE_READY", "HOLD_COMPLETED", "PREP_COMPLETED"]:
 		feedback_label.modulate = Color("ffd85a")
-	elif code in ["MOVEMENT_TOO_FAST", "REP_REJECTED", "HOLD_INTERRUPTED", "TRACKING_LOST", "BACKEND_DISCONNECTED"]:
+	elif code in ["MOVEMENT_TOO_FAST", "REP_REJECTED", "HOLD_INTERRUPTED", "CAMERA_DISCONNECTED", "TRACKING_LOST", "BACKEND_DISCONNECTED", "SWITCH_ARM_SIDE", "CLAMP_WITH_OTHER_HAND"]:
 		feedback_label.modulate = Color(0.9, 0.2, 0.1)
 	else:
 		feedback_label.modulate = Color.WHITE
+
+	if code in ["HOLD_INTERRUPTED", "MOVEMENT_TOO_FAST", "REP_REJECTED"]:
+		var current_text := feedback_label.text
+		get_tree().create_timer(2.0).timeout.connect(func():
+			if is_instance_valid(feedback_label) and feedback_label.text == current_text:
+				_on_session_feedback_changed("PREP_POSITION")
+		)
+
+
+func _on_pose_frame_received(data: Dictionary) -> void:
+	if exercise_session.state != ExerciseSession.State.ACTIVE:
+		return
+	var ex: Dictionary = data.get("exercise", {})
+	var angles: Dictionary = data.get("angles", {})
+	var fb_code := str(ex.get("feedback_code", ""))
+	if fb_code in ["PREP_POSITION", "PREP_COMPLETED", "CONTINUE_MOVEMENT", "CLAMP_WITH_OTHER_HAND", "SWITCH_ARM_SIDE", "RETURN_TO_PREP"]:
+		_on_session_feedback_changed(fb_code)
+	var req_side := str(angles.get("required_side", ""))
+	var act_side := str(angles.get("active_side", ""))
+	if req_side == "left":
+		side_label.text = "BÊN: TAY TRÁI (ĐỔI BÊN)"
+	elif req_side == "right":
+		side_label.text = "BÊN: TAY PHẢI (ĐỔI BÊN)"
+	elif act_side == "left":
+		side_label.text = "BÊN: TAY TRÁI"
+	elif act_side == "right":
+		side_label.text = "BÊN: TAY PHẢI"
 
 
 func _on_repetition_accepted(data: Dictionary) -> void:
@@ -127,11 +157,17 @@ func _on_repetition_rejected(_data: Dictionary) -> void:
 	map5_controller.handle_hold_interrupted()
 
 
+func _on_hold_started(_data: Dictionary) -> void:
+	map5_controller.handle_hold_started()
+	feedback_label.text = _feedback_text("HOLD_STARTED")
+	feedback_label.modulate = Color("ffd85a")
+
+
 func _on_hold_progress_changed(progress: float, elapsed_ms: int, target_ms: int) -> void:
 	hold_bar.value = progress * 100.0
 	var elapsed_seconds := float(elapsed_ms) / 1000.0
 	var target_seconds := float(target_ms) / 1000.0
-	hold_label.text = "GIỮ CĂNG: %.1f/%.1f GIÂY" % [elapsed_seconds, target_seconds]
+	hold_label.text = "THIỀN GIỮ CĂNG: %.1f/%.1f GIÂY" % [elapsed_seconds, target_seconds]
 	map5_controller.set_hold_progress(progress)
 
 
@@ -142,11 +178,11 @@ func _on_hold_interrupted(_data: Dictionary) -> void:
 func _on_hold_visual_progress_changed(progress: float) -> void:
 	if progress <= 0.0:
 		hold_bar.value = 0.0
-		hold_label.text = "GIỮ CĂNG: 0.0/30.0 GIÂY"
+		hold_label.text = "THIỀN GIỮ CĂNG: 0.0/30.0 GIÂY"
 
 
 func _on_rest_time_changed(seconds_remaining: float) -> void:
-	rest_label.text = "THƯ GIÃN: %d GIÂY\nNhấn N để bỏ qua khi debug" % ceili(seconds_remaining)
+	rest_label.text = "THƯ GIÃN: %d GIÂY" % ceili(seconds_remaining)
 
 
 func _on_session_completed(summary: Dictionary) -> void:
@@ -306,19 +342,27 @@ func _state_text(value: ExerciseSession.State) -> String:
 
 func _feedback_text(code: String) -> String:
 	const TEXTS := {
-		"SESSION_READY": "Suối nước nóng sẵn sàng. Bắt đầu kéo căng nhẹ nhàng.",
-		"ACTION_ZONE_READY": "Kéo cánh tay qua ngực và giữ căng 30 giây.",
-		"MOVEMENT_STARTED": "Đã nhận chuyển động.",
-		"TARGET_REACHED": "Đúng tư thế. Bắt đầu giữ căng 30 giây.",
-		"HOLD_STARTED": "Giữ nguyên tư thế căng...",
-		"HOLD_PROGRESS": "Tiếp tục giữ — điểm thưởng đang tích lũy.",
-		"HOLD_COMPLETED": "Đã giữ căng đủ 30 giây!",
-		"HOLD_INTERRUPTED": "Tư thế bị gián đoạn. Hãy thả lỏng và thử lại chậm rãi.",
-		"REP_VALID": "Tốt lắm! Đã nhận điểm thưởng.",
+		"SESSION_READY": "Suối nước nóng sẵn sàng. Hãy thả lỏng 2 vai để chuẩn bị.",
+		"ACTION_ZONE_READY": "Thả lỏng 2 vai ở tư thế chuẩn bị (100% ROM) trước khi kéo căng.",
+		"PREP_POSITION": "Đứng thẳng, thả lỏng 2 vai cân bằng để vào tư thế chuẩn bị...",
+		"PREP_COMPLETED": "Đã chuẩn bị! Hãy kéo cánh tay qua ngực và dùng tay kia kẹp giữ.",
+		"MOVEMENT_STARTED": "Đã nhận tư thế chuẩn bị! Bắt đầu kéo căng cánh tay qua ngực.",
+		"CONTINUE_MOVEMENT": "Kéo khuỷu tay sát vai đối diện và dùng cổ tay kia kẹp giữ trước ngực...",
+		"CLAMP_WITH_OTHER_HAND": "Hãy dùng cẳng tay/cổ tay còn lại kẹp giữ khuỷu tay vào ngực!",
+		"SWITCH_ARM_SIDE": "Bạn đã tập bên tay này ở Hiệp 1! Hãy đổi sang kéo căng tay đối diện!",
+		"TARGET_REACHED": "Đúng tư thế (ROM 100%)! Bắt đầu thiền giữ căng 30 giây.",
+		"HOLD_STARTED": "Đang thiền và giữ căng 30 giây...",
+		"HOLD_PROGRESS": "Duy trì hơi thở đều đặn và giữ nguyên tư thế kéo căng 30 giây...",
+		"HOLD_COMPLETED": "Hoàn thành 30 giây thiền kéo căng! Nhận +100 điểm thưởng!",
+		"HOLD_INTERRUPTED": "Tư thế bị gián đoạn. Hãy kéo căng và kẹp giữ lại chậm rãi.",
+		"RETURN_TO_PREP": "Thả lỏng 2 tay về tư thế chuẩn bị.",
+		"REP_VALID": "Tuyệt vời! Đã hoàn thành hiệp kéo căng (+100 điểm thưởng).",
 		"MOVEMENT_TOO_FAST": "Cử động quá nhanh. Hãy kéo căng chậm hơn.",
 		"REP_REJECTED": "Lần căng chưa hợp lệ.",
-		"PHASE_REST": "Hoàn thành một bên. Hãy thư giãn 30 giây trước khi đổi tay.",
-		"NEXT_PHASE": "Bắt đầu căng bên tay còn lại.",
+		"PHASE_REST": "Hoàn thành hiệp 1. Hãy thư giãn 30 giây trước khi đổi sang tay đối diện.",
+		"NEXT_PHASE": "Bắt đầu hiệp 2: Hãy đổi sang kéo căng cánh tay đối diện qua ngực!",
+		"CAMERA_DISCONNECTED": "Mất kết nối Camera! Vui lòng kiểm tra lại dây cắm.",
+		"CAMERA_RECONNECTED": "Đã kết nối lại Camera. Tiếp tục buổi tập.",
 		"TRACKING_LOST": "Không nhìn thấy người chơi. Buổi tập đã tạm dừng.",
 		"TRACKING_RESTORED": "Đã nhận diện lại. Tiếp tục buổi tập.",
 		"BACKEND_DISCONNECTED": "Mất kết nối với hệ thống nhận diện.",

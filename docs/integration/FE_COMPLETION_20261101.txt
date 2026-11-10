@@ -1,0 +1,32 @@
+UI/FE integration on the backend-enabled project — 2026-11-01
+
+Scope: UI scripts, presentation helpers, documentation and UI-only tests.
+No Python service/evaluator, core session logic, persistence, scoring,
+calibration algorithm, authentication or database schema changed in this pass.
+
+History:
+- Filter sessions already returned for the active patient by map, end status,
+  and rolling last 7/30 days. Filters do not modify saves or issue DB requests.
+- Overall dashboard and calibration chart retain their explicitly labelled
+  whole-profile/last-ten-measurement scope; filters affect session list only.
+- Empty filter result can clear filters or navigate to existing calibration.
+- Show goals, active time and repetition progress without expanding details.
+- Show count of pending existing outbox requests. Retry uses existing manager
+  controls; zero pending does not claim the cloud is online.
+
+Results:
+- Read session_completed summary; never borrow the last history record.
+- Show owner, map/difficulty snapshot, accepted/rejected counts, goals,
+  repetition progress, active time, evaluation and available bonus points.
+- Retain map controller's next-level message and original difficulty button.
+- Scroll summary/details inside a responsive panel; existing replay/map/history
+  navigation remains unchanged.
+- Missing or zero targets do not display a fabricated percentage.
+
+Calibration terminology:
+History chart/cards use "chỉ số hiệu chuẩn" and remove raw-degree notation.
+No stored values, normalization formula or historical records are rewritten.
+
+Validation: synthetic data with --no-save; no real camera or cloud writes.
+Still outside FE scope: server authorization, crash recovery checkpoints,
+live Atlas validation, and clinical approval of recognition thresholds.

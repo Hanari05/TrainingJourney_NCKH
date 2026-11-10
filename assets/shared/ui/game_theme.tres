@@ -1,65 +1,21 @@
-[gd_resource type="Theme" load_steps=12 format=3]
+[gd_resource type="Theme" format=3 uid="uid://dqlhfk1j1wlmu"]
 
-[ext_resource type="Texture2D" path="res://assets/shared/ui/rustic/normal.svg" id="normal"]
-[ext_resource type="Texture2D" path="res://assets/shared/ui/rustic/hover.svg" id="hover"]
-[ext_resource type="Texture2D" path="res://assets/shared/ui/rustic/pressed.svg" id="pressed"]
 [ext_resource type="Texture2D" path="res://assets/shared/ui/rustic/disabled.svg" id="disabled"]
+[ext_resource type="Texture2D" path="res://assets/shared/ui/rustic/hover.svg" id="hover"]
+[ext_resource type="Texture2D" path="res://assets/shared/ui/rustic/normal.svg" id="normal"]
 [ext_resource type="Texture2D" path="res://assets/shared/ui/rustic/panel.svg" id="panel"]
-
-[sub_resource type="StyleBoxTexture" id="normal"]
-texture = ExtResource("normal")
-texture_margin_left = 12.0
-texture_margin_top = 12.0
-texture_margin_right = 12.0
-texture_margin_bottom = 12.0
-content_margin_left = 12.0
-content_margin_top = 10.0
-content_margin_right = 12.0
-content_margin_bottom = 10.0
-
-[sub_resource type="StyleBoxTexture" id="hover"]
-texture = ExtResource("hover")
-texture_margin_left = 12.0
-texture_margin_top = 12.0
-texture_margin_right = 12.0
-texture_margin_bottom = 12.0
-content_margin_left = 12.0
-content_margin_top = 10.0
-content_margin_right = 12.0
-content_margin_bottom = 10.0
-
-[sub_resource type="StyleBoxTexture" id="pressed"]
-texture = ExtResource("pressed")
-texture_margin_left = 12.0
-texture_margin_top = 12.0
-texture_margin_right = 12.0
-texture_margin_bottom = 12.0
-content_margin_left = 12.0
-content_margin_top = 11.0
-content_margin_right = 12.0
-content_margin_bottom = 9.0
+[ext_resource type="Texture2D" path="res://assets/shared/ui/rustic/pressed.svg" id="pressed"]
 
 [sub_resource type="StyleBoxTexture" id="disabled"]
+content_margin_left = 12.0
+content_margin_top = 10.0
+content_margin_right = 12.0
+content_margin_bottom = 10.0
 texture = ExtResource("disabled")
 texture_margin_left = 12.0
 texture_margin_top = 12.0
 texture_margin_right = 12.0
 texture_margin_bottom = 12.0
-content_margin_left = 12.0
-content_margin_top = 10.0
-content_margin_right = 12.0
-content_margin_bottom = 10.0
-
-[sub_resource type="StyleBoxTexture" id="panel"]
-texture = ExtResource("panel")
-texture_margin_left = 12.0
-texture_margin_top = 12.0
-texture_margin_right = 12.0
-texture_margin_bottom = 12.0
-content_margin_left = 18.0
-content_margin_top = 18.0
-content_margin_right = 18.0
-content_margin_bottom = 18.0
 
 [sub_resource type="StyleBoxFlat" id="focus"]
 bg_color = Color(0, 0, 0, 0)
@@ -70,18 +26,62 @@ border_width_right = 2
 border_width_bottom = 2
 border_color = Color(1, 0.89, 0.56, 1)
 
+[sub_resource type="StyleBoxTexture" id="hover"]
+content_margin_left = 12.0
+content_margin_top = 10.0
+content_margin_right = 12.0
+content_margin_bottom = 10.0
+texture = ExtResource("hover")
+texture_margin_left = 12.0
+texture_margin_top = 12.0
+texture_margin_right = 12.0
+texture_margin_bottom = 12.0
+
+[sub_resource type="StyleBoxTexture" id="normal"]
+content_margin_left = 12.0
+content_margin_top = 10.0
+content_margin_right = 12.0
+content_margin_bottom = 10.0
+texture = ExtResource("normal")
+texture_margin_left = 12.0
+texture_margin_top = 12.0
+texture_margin_right = 12.0
+texture_margin_bottom = 12.0
+
+[sub_resource type="StyleBoxTexture" id="pressed"]
+content_margin_left = 12.0
+content_margin_top = 11.0
+content_margin_right = 12.0
+content_margin_bottom = 9.0
+texture = ExtResource("pressed")
+texture_margin_left = 12.0
+texture_margin_top = 12.0
+texture_margin_right = 12.0
+texture_margin_bottom = 12.0
+
+[sub_resource type="StyleBoxTexture" id="panel"]
+content_margin_left = 18.0
+content_margin_top = 18.0
+content_margin_right = 18.0
+content_margin_bottom = 18.0
+texture = ExtResource("panel")
+texture_margin_left = 12.0
+texture_margin_top = 12.0
+texture_margin_right = 12.0
+texture_margin_bottom = 12.0
+
 [resource]
 default_font_size = 20
-Label/colors/font_color = Color(0.18, 0.12, 0.07, 1)
-CheckButton/colors/font_color = Color(0.18, 0.12, 0.07, 1)
 Button/colors/font_color = Color(0.18, 0.1, 0.04, 1)
-Button/colors/font_hover_color = Color(0.1, 0.06, 0.02, 1)
-Button/colors/font_focus_color = Color(0.1, 0.06, 0.02, 1)
-Button/colors/font_pressed_color = Color(0.15, 0.09, 0.04, 1)
 Button/colors/font_disabled_color = Color(0.36, 0.34, 0.28, 1)
-PanelContainer/styles/panel = SubResource("panel")
-Button/styles/normal = SubResource("normal")
-Button/styles/hover = SubResource("hover")
-Button/styles/pressed = SubResource("pressed")
+Button/colors/font_focus_color = Color(0.1, 0.06, 0.02, 1)
+Button/colors/font_hover_color = Color(0.1, 0.06, 0.02, 1)
+Button/colors/font_pressed_color = Color(0.15, 0.09, 0.04, 1)
 Button/styles/disabled = SubResource("disabled")
 Button/styles/focus = SubResource("focus")
+Button/styles/hover = SubResource("hover")
+Button/styles/normal = SubResource("normal")
+Button/styles/pressed = SubResource("pressed")
+CheckButton/colors/font_color = Color(0.18, 0.12, 0.07, 1)
+Label/colors/font_color = Color(0.18, 0.12, 0.07, 1)
+PanelContainer/styles/panel = SubResource("panel")

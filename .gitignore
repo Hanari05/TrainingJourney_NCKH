@@ -1,16 +1,43 @@
-# Godot editor cache
+# Godot editor cache & imports
 .godot/
+*.import
 
 # Operating-system metadata
 .DS_Store
+Thumbs.db
 __MACOSX/
+
+# Python cache & build
+__pycache__/
+*.py[cod]
+*$py.class
+*.spec
+build/
+dist/
+*.egg-info/
+.venv/
+env/
+venv/
 
 # Temporary image/editor backups
 *.png~
 *.aseprite~
+*.tmp
+*.bak
 
-# Generated test captures/profiles (never player saves)
+# Generated test captures/profiles
 tests/visual_output/
 tests/visual/captures/
-tests/*.json
-tests/*.json.bak
+
+# Backup folders
+-NCKH-*/
+*-backup*/
+
+# Local credentials and generated patient data
+cloud_config.json
+mongodb_config.json
+.env
+.env.*
+!.env.example
+player_progress.json
+tests/*_persistence_test.json

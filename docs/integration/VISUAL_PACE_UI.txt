@@ -1,0 +1,29 @@
+CHUYỂN ĐỘNG CẢNH VÀ MỨC TẬP — 2026-11-02
+
+Phạm vi: 5 map x 3 mức (1.0x, 1.5x, 2.0x), chỉ thay đổi FE.
+Màn chọn mức ghi rõ chuyển động áp dụng và thời gian giữ/nghỉ.
+HUD ghi mức và nhịp cảnh; Map 5 dùng tên Hiệu ứng cảnh.
+
+Map 1: đá tiến đến, nhịp chạy và hoạt ảnh chưởng.
+Map 2: đá hạ xuống, hoạt ảnh nâng thành công và hiệu ứng quanh tay.
+Map 3: tường tiến vào và hiệu ứng đẩy tường; thời gian chuyển đợt sau hiệu ứng được đồng bộ.
+Map 4: thời gian chạy trên bậc và nhảy chia cho hệ số; nhịp chân đồng bộ.
+Map 5: tốc độ hơi nước quanh nhân vật thiền thay đổi; thời gian giữ không đổi.
+
+Không nhân Engine.time_scale. Không thay đổi animation hướng dẫn động tác.
+Không thay đổi main.py, exercises_logic.py, provider, ExerciseSession hoặc cấu hình bài tập.
+Giữ nguyên tín hiệu hold_progress từ BE: KHÔNG nhân tiến độ giữ theo tốc độ cảnh.
+Thời gian giữ: Map 1 = 700 ms; Map 2-4 = 5000 ms; Map 5 = 30000 ms.
+Nghỉ giữa hiệp 30 giây. Số lần, hiệp, điểm, lưu lịch sử và mở mức giữ nguyên.
+Cảnh vẫn dừng tại vùng hành động, chờ lượt hợp lệ theo cơ chế có sẵn.
+
+Giới hạn BE hiện có (không sửa trong đợt này):
+Map 1 sử dụng target_rom_ratio theo mức 0.75/0.78/0.80.
+Map 2-5 vẫn gửi 0.70/0.80/0.90 nhưng công thức đánh giá hiện chưa sử dụng
+các tỷ lệ này để phân biệt mức. Không quảng bá các con số tốc độ cảnh là
+hệ số tăng độ khó nhận diện hoặc tốc độ thực hiện của người tập.
+
+Kiểm thử: tests/core/visual_pace.tscn, chạy Godot kèm -- --no-save.
+Bao phủ 15 tổ hợp, tốc độ đá/tường, thời lượng tween chạy/nhảy, nhịp hiệu ứng,
+cấu hình provider, giữ tư thế, nghỉ, khóa mức và bố cục chọn mức/HUD.
+Kiểm thử dùng provider giả lập, không camera/DB, không lưu dữ liệu người tập.

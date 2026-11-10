@@ -4,7 +4,7 @@ extends Node2D
 @export var tracking_loss_grace_seconds := 3.0
 
 const EXERCISE_CONFIGS := {
-	1: {"exercise_id": "scapular_retraction", "repetitions_per_phase": 10, "phase_count": 2, "hold_duration_ms": 0},
+	1: {"exercise_id": "scapular_retraction", "repetitions_per_phase": 10, "phase_count": 2, "hold_duration_ms": 700},
 	2: {"exercise_id": "wall_abduction_external_rotation", "repetitions_per_phase": 5, "phase_count": 2, "hold_duration_ms": 5000},
 	3: {"exercise_id": "horizontal_shoulder_adduction", "repetitions_per_phase": 5, "phase_count": 2, "hold_duration_ms": 5000},
 	4: {"exercise_id": "hands_behind_head", "repetitions_per_phase": 5, "phase_count": 2, "hold_duration_ms": 5000},
@@ -19,6 +19,7 @@ var star_score = 0
 var _session_config: Dictionary = {}
 var _session_attempt := 0
 var _intro_running := false
+var _map1_rom_dropped_below_40 := true
 
 @onready var exercise_session: ExerciseSession = $ExerciseSession
 @onready var map1_controller: Map1Controller = $Map1Controller
@@ -58,6 +59,7 @@ func _ready() -> void:
 	exercise_session.repetition_rejected.connect(_on_repetition_rejected)
 	exercise_session.rest_time_changed.connect(_on_rest_time_changed)
 	exercise_session.session_completed.connect(_on_session_completed)
+	PoseInput.pose_frame_received.connect(_on_pose_frame_received)
 	tracking_stability.grace_seconds = tracking_loss_grace_seconds
 	tracking_stability.setup(exercise_session, PoseInput)
 	tracking_stability.stability_changed.connect(_on_stability_changed)
@@ -86,6 +88,7 @@ func _ready() -> void:
 
 
 func _unhandled_key_input(event: InputEvent) -> void:
+	if not OS.is_debug_build(): return
 	if event is InputEventKey and event.pressed and not event.echo and event.physical_keycode == KEY_N:
 		exercise_session.debug_skip_rest()
 
@@ -95,7 +98,7 @@ func _mount_presentation() -> void:
 	add_child(presentation)
 
 
-func _on_session_state_changed(current: ExerciseSession.State, previous: ExerciseSession.State) -> void:
+func _on_session_state_changed(current: ExerciseSession.State, _previous: ExerciseSession.State) -> void:
 	state_label.text = "TRẠNG THÁI: %s" % _state_text(current)
 	rest_label.visible = current == ExerciseSession.State.RESTING
 	var gameplay_active := current == ExerciseSession.State.ACTIVE
@@ -111,24 +114,49 @@ func _on_session_progress_changed(rep: int, reps_required: int, phase: int, phas
 	phase_label.text = "HIỆP: %d/%d" % [phase, phases]
 
 
+func _on_pose_frame_received(data: Dictionary) -> void:
+	if Global.selected_action == 1:
+		var ex: Dictionary = data.get("exercise", {})
+		var rom: float = float(ex.get("rom_progress", 1.0))
+		var m_state: String = str(ex.get("movement_state", ""))
+		var fb_code: String = str(ex.get("feedback_code", ""))
+		if rom < 0.40 or m_state in ["ready", "contracting", "holding"]:
+			if fb_code != "RELEASE_POSITION":
+				_map1_rom_dropped_below_40 = true
+
+
 func _on_session_feedback_changed(code: String) -> void:
 	var display_code := code
-	if Global.selected_action == 1 and code == "SESSION_READY" and not map1_controller.is_action_window_open():
-		display_code = "ROCK_APPROACHING"
+	if Global.selected_action == 1:
+		if not _map1_rom_dropped_below_40 and (code == "SESSION_READY" or code == "ROCK_APPROACHING" or code == "ACTION_ZONE_READY"):
+			display_code = "RELEASE_POSITION"
+		elif code == "SESSION_READY" and not map1_controller.is_action_window_open():
+			display_code = "ROCK_APPROACHING"
 	feedback_label.text = _feedback_text(display_code)
 	match display_code:
-		"REP_VALID", "TRACKING_RESTORED", "ACTION_ZONE_READY":
+		"REP_VALID", "TRACKING_RESTORED", "CAMERA_RECONNECTED", "ACTION_ZONE_READY", "READY_FOR_NEXT_REP", "TARGET_REACHED", "HOLD_COMPLETED":
 			feedback_label.modulate = Color("ffd85a")
-		"MOVEMENT_TOO_FAST", "REP_REJECTED", "TRACKING_LOST", "BACKEND_DISCONNECTED":
+		"RELEASE_POSITION", "ROCK_APPROACHING", "CONTINUE_MOVEMENT", "MOVEMENT_STARTED", "HOLD_STARTED", "KEEP_POSITION":
+			feedback_label.modulate = Color(0.2, 0.8, 1.0)
+		"MOVEMENT_TOO_FAST", "REP_REJECTED", "CAMERA_DISCONNECTED", "TRACKING_LOST", "BACKEND_DISCONNECTED", "HOLD_INTERRUPTED":
 			feedback_label.modulate = Color(0.9, 0.2, 0.1)
 		_:
 			feedback_label.modulate = Color.WHITE
 
+	if display_code in ["HOLD_INTERRUPTED", "MOVEMENT_TOO_FAST", "REP_REJECTED"]:
+		var current_text := feedback_label.text
+		get_tree().create_timer(2.0).timeout.connect(func():
+			if is_instance_valid(feedback_label) and feedback_label.text == current_text:
+				var next_code := "ACTION_ZONE_READY" if map1_controller.is_action_window_open() else "ROCK_APPROACHING"
+				_on_session_feedback_changed(next_code)
+		)
+
 
 func _on_repetition_accepted(data: Dictionary) -> void:
-	feedback_label.modulate = Color("ffd85a")
 	if Global.selected_action == 1:
+		_map1_rom_dropped_below_40 = false
 		map1_controller.handle_valid_repetition(data)
+	feedback_label.modulate = Color("ffd85a")
 
 
 func _on_repetition_rejected(_data: Dictionary) -> void:
@@ -136,7 +164,7 @@ func _on_repetition_rejected(_data: Dictionary) -> void:
 
 
 func _on_rest_time_changed(seconds_remaining: float) -> void:
-	rest_label.text = "NGHỈ: %d GIÂY\nNhấn N để bỏ qua khi debug" % ceili(seconds_remaining)
+	rest_label.text = "NGHỈ: %d GIÂY" % ceili(seconds_remaining)
 
 
 func _on_session_completed(summary: Dictionary) -> void:
@@ -181,6 +209,8 @@ func _on_tracking_penalty_applied(_current: int, grace_seconds: float) -> void:
 
 func _on_action_window_changed(is_open: bool) -> void:
 	exercise_session.set_repetition_input_enabled(is_open)
+	if is_open:
+		feedback_label.text = _feedback_text("ACTION_ZONE_READY")
 
 
 func _show_map1_intro() -> void:
@@ -234,10 +264,10 @@ func _difficulty_name() -> String:
 
 func _target_rom_ratio() -> float:
 	if Global.speed_multiplier >= 2.0:
-		return 0.90
-	if Global.speed_multiplier >= 1.5:
 		return 0.80
-	return 0.70
+	if Global.speed_multiplier >= 1.5:
+		return 0.78
+	return 0.75
 
 
 func _unlock_next_difficulty(stability: int) -> bool:
@@ -282,22 +312,32 @@ func _state_text(value: ExerciseSession.State) -> String:
 
 func _feedback_text(code: String) -> String:
 	const TEXTS := {
-		"SESSION_READY": "Sẵn sàng. Hãy thực hiện động tác chậm rãi.",
+		"SESSION_READY": "Sẵn sàng chạy bộ vượt chướng ngại vật.",
 		"SESSION_PAUSED": "Buổi tập đang tạm dừng.",
 		"SESSION_RESUMED": "Đã sẵn sàng. Tiếp tục buổi tập.",
-		"ROCK_APPROACHING": "Chướng ngại vật đang tới. Hãy chuẩn bị đúng tư thế.",
-		"ACTION_ZONE_READY": "Đá đã vào vị trí. Hãy ép hai bả vai ra sau chậm rãi.",
-		"MOVEMENT_STARTED": "Đã bắt đầu chuyển động...",
-		"TARGET_REACHED": "Đã đạt ngưỡng mục tiêu.",
-		"REP_VALID": "Tốt lắm! Một lần tập hợp lệ.",
-		"MOVEMENT_TOO_FAST": "Cử động quá nhanh. Hãy thực hiện chậm hơn.",
+		"ROCK_APPROACHING": "Tảng đá đang lăn tới gần! Hãy vươn hai tay về phía trước chuẩn bị.",
+		"ACTION_ZONE_READY": "Tảng đá đã vào tầm chém! Hãy co ép hai bả vai ra sau để phá đá!",
+		"POSITION_OK": "Tư thế tốt. Vươn hai tay về phía trước.",
+		"READY_FOR_NEXT_REP": "Sẵn sàng! Hãy co ép hai bả vai ra sau để chém đá!",
+		"RELEASE_POSITION": "Đã chém vỡ đá! Hãy đưa hai tay về trước để thực hiện lần chém mới.",
+		"MOVEMENT_STARTED": "Đang co ép hai bả vai ra sau...",
+		"CONTINUE_MOVEMENT": "Tiếp tục ép chặt hai bả vai ra sau để chém đá!",
+		"TARGET_REACHED": "Đã ép bả vai tối đa! Giữ yên tư thế...",
+		"HOLD_STARTED": "Đang ép chặt bả vai... Giữ nguyên tư thế!",
+		"KEEP_POSITION": "Đang ép chặt bả vai... Giữ nguyên tư thế!",
+		"HOLD_COMPLETED": "Tuyệt vời! Đã chém vỡ tảng đá!",
+		"HOLD_INTERRUPTED": "Giữ chưa đủ thời gian! Hãy thử lại",
+		"REP_VALID": "Tuyệt vời! Đã chém tan tảng đá!",
+		"MOVEMENT_TOO_FAST": "Cử động quá nhanh! Hãy co ép chậm lại và giữ tư thế để tránh chấn thương khớp.",
 		"REP_REJECTED": "Lần tập chưa hợp lệ.",
 		"PHASE_REST": "Hoàn thành hiệp. Hãy nghỉ 30 giây.",
 		"NEXT_PHASE": "Bắt đầu hiệp tiếp theo.",
+		"CAMERA_DISCONNECTED": "Mất kết nối Camera! Vui lòng kiểm tra lại dây cắm.",
+		"CAMERA_RECONNECTED": "Đã kết nối lại Camera. Tiếp tục buổi tập.",
 		"TRACKING_LOST": "Không nhìn thấy người chơi. Buổi tập đã tạm dừng.",
 		"TRACKING_RESTORED": "Đã nhận diện lại. Tiếp tục buổi tập.",
 		"BACKEND_DISCONNECTED": "Mất kết nối với hệ thống nhận diện.",
-		"SESSION_COMPLETED": "Hoàn thành buổi tập!",
+		"SESSION_COMPLETED": "Hoàn thành Map 1!",
 	}
 	return TEXTS.get(code, code)
 

@@ -10,7 +10,7 @@ config_version=5
 
 [application]
 
-config/name="New Game Project"
+config/name="Hân"
 run/main_scene="res://ui/screens/start/start_screen.tscn"
 config/features=PackedStringArray("4.7", "Mobile")
 config/icon="res://icon.svg"
@@ -18,11 +18,13 @@ config/icon="res://icon.svg"
 [autoload]
 
 Global="*res://core/autoload/global.gd"
-PoseInput="*res://core/pose/mock_pose_provider.gd"
+PoseInput="*res://core/pose/backend_pose_provider.gd"
 AudioManager="*res://core/audio/audio_manager.gd"
+HandCursor="*res://ui/shared/hand_cursor_layer.tscn"
 
 [display]
 
+window/size/mode=2
 window/size/window_width_override=1152
 window/size/window_height_override=648
 window/stretch/mode="canvas_items"

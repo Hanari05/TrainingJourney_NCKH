@@ -4,7 +4,6 @@ extends PoseProvider
 ## Debug keys:
 ##   T - toggle tracking
 ##   K - disconnect/reconnect the mock backend
-##   C - run a five-second calibration
 ##   R - emit one valid repetition, including hold progress when required
 ##   F - emit one rejected repetition or interrupted hold
 
@@ -52,6 +51,7 @@ func _process(delta: float) -> void:
 
 
 func _unhandled_key_input(event: InputEvent) -> void:
+	if not OS.is_debug_build(): return
 	if not event is InputEventKey or not event.pressed or event.echo:
 		return
 
@@ -63,12 +63,6 @@ func _unhandled_key_input(event: InputEvent) -> void:
 				close_connection()
 			else:
 				open_connection()
-		KEY_C:
-			start_calibration({
-				"exercise_id": _current_exercise_id(),
-				"duration_ms": 5000,
-				"target_side": "both",
-			})
 		KEY_R:
 			simulate_valid_rep()
 		KEY_F:
