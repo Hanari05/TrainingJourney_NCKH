@@ -33,7 +33,7 @@ tests/visual/captures/
 -NCKH-*/
 *-backup*/
 
-# Local credentials and generated patient data
+# Local configuration, patient data and generated test state
 cloud_config.json
 mongodb_config.json
 .env
@@ -41,3 +41,4 @@ mongodb_config.json
 !.env.example
 player_progress.json
 tests/*_persistence_test.json
+*.log
